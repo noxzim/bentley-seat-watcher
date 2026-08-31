@@ -2,6 +2,8 @@
   "term": "202609",
   "interval_minutes": 5,
   "realert_after_minutes": 180,
+  "heartbeat_minutes": 60,
+  "heartbeat_priority": "low",
   "ntfy_topic": "",
   "sections": [
     "EMS 210-1",

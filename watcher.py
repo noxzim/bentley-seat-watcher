@@ -224,7 +224,29 @@ def check_once(cfg, state, topic, dry_run=False, email=None):
                    f"Watching {len(found)} sections again.",
                    priority="default", tags="white_check_mark", dry_run=dry_run)
         strikes, warned = 0, False
-    state["__health"] = {"strikes": strikes, "warned": warned, "last_poll": now}
+    # Periodic "still watching" note. Deliberately skipped while blind: a
+    # reassuring heartbeat sent by a scraper that can't read the site would be
+    # worse than silence.
+    hb_min = int(cfg.get("heartbeat_minutes", 60))
+    last_hb = float(health.get("last_heartbeat", 0))
+    if hb_min and not blind and now - last_hb >= hb_min * 60:
+        open_now = [c for c, x in sorted(found.items())
+                    if x["status"].lower() == "open" and x["seats"] > 0]
+        every = cfg.get("interval_minutes", 5)
+        if open_now:
+            title = f"{len(open_now)} of {len(found)} sections OPEN"
+            body = ", ".join(open_now) + "\nGo register."
+        else:
+            title = "Still searching - nothing open yet"
+            body = (f"All {len(found)} sections still full. "
+                    f"Rechecking every {every} min.")
+        notify(topic, title, body,
+               priority=cfg.get("heartbeat_priority", "low"),
+               tags="hourglass_flowing_sand", dry_run=dry_run, email=None)
+        last_hb = now
+
+    state["__health"] = {"strikes": strikes, "warned": warned,
+                         "last_poll": now, "last_heartbeat": last_hb}
 
     for code, sec in sorted(found.items()):
         prev = state.get(code, {})

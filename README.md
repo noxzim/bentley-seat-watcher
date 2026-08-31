@@ -44,6 +44,10 @@ Edit `watchlist.json`:
   `202605G` Summer 10-week.
 - **`realert_after_minutes`** — if a section is still open after this long,
   you get a reminder. Set higher if it gets noisy.
+- **`heartbeat_minutes`** — how often to send a "still searching, nothing open"
+  note so you know the watcher is alive. Set `0` to turn it off.
+- **`heartbeat_priority`** — `low` delivers it silently to your notification
+  list (it won't wake you at 3am). Use `default` if you want it to banner.
 - Leave `ntfy_topic` empty here and use the `NTFY_TOPIC` env var / GitHub
   secret instead, so your topic never lands in the repo.
 
