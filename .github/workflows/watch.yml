@@ -7,9 +7,16 @@ on:
   schedule:
     - cron: "0 */5 * * *"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "watch = poll for 5.5h; verify = one quick check that the runner still works"
+        type: choice
+        options: [watch, verify]
+        default: watch
 
+# Verify runs in its own group so a health check never cancels the live watcher.
 concurrency:
-  group: seat-watcher
+  group: seat-watcher-${{ inputs.mode || 'watch' }}
   cancel-in-progress: true
 
 jobs:
@@ -23,9 +30,21 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Verify proves three things end to end: the secret is readable, ntfy
+      # accepts a push from the runner, and the listing is still parseable.
+      # The dry run uses a throwaway state file so it can't eat a real alert.
+      - name: Verify (push a test alert, then one silent poll)
+        if: inputs.mode == 'verify'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          python3 watcher.py --test-push
+          python3 watcher.py --dry-run --state "$RUNNER_TEMP/verify.json"
+
       # Carry alert history between runs so a restart doesn't re-notify you
       # about a section you already saw.
       - name: Restore watcher state
+        if: inputs.mode != 'verify'
         uses: actions/cache/restore@v4
         with:
           path: state.json
@@ -33,12 +52,13 @@ jobs:
           restore-keys: seat-state-
 
       - name: Watch for open seats
+        if: inputs.mode != 'verify'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python3 watcher.py --loop --max-minutes 330
 
       - name: Save watcher state
-        if: always()
+        if: always() && inputs.mode != 'verify'
         uses: actions/cache/save@v4
         with:
           path: state.json
