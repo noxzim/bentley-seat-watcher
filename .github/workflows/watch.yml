@@ -1,0 +1,45 @@
+name: Bentley seat watcher
+
+# GitHub's scheduled triggers are often delayed by 10-30 minutes, so instead of
+# one cron per poll this starts a single long-lived job that polls internally on
+# an exact interval. The cron just restarts it before the 6h job limit.
+on:
+  schedule:
+    - cron: "0 */5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: seat-watcher
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Carry alert history between runs so a restart doesn't re-notify you
+      # about a section you already saw.
+      - name: Restore watcher state
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: seat-state-${{ github.run_id }}
+          restore-keys: seat-state-
+
+      - name: Watch for open seats
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 watcher.py --loop --max-minutes 330
+
+      - name: Save watcher state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: seat-state-${{ github.run_id }}

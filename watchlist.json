@@ -1,0 +1,21 @@
+{
+  "term": "202609",
+  "interval_minutes": 10,
+  "realert_after_minutes": 180,
+  "ntfy_topic": "",
+  "sections": [
+    "EMS 210-1",
+    "EMS 222-1",
+    "HI 317-1",
+    "PH 102-5",
+    "PH 102-6",
+    "PH 142-1",
+    "PH 310-1",
+    "CS 305-9",
+    "CS 305-11",
+    "CS 305-12",
+    "MG 300-1",
+    "MG 300-2",
+    "MG 300-3"
+  ]
+}
