@@ -75,7 +75,7 @@ NTFY_TOPIC=your-secret-topic-here python3 watcher.py --loop
    named `NTFY_TOPIC`, set to your topic.
 3. Actions tab → "Bentley seat watcher" → **Run workflow**.
 
-The workflow starts one long-running job that polls every 10 minutes for 5.5
+The workflow starts one long-running job that polls every 5 minutes for 5.5
 hours, then cron restarts it. This is deliberate: GitHub's scheduled triggers
 are routinely 10-30 minutes late, so a cron-per-poll would poll erratically.
 Only the restart is subject to that delay, not each individual check.

@@ -171,6 +171,7 @@ def check_once(cfg, state, topic, dry_run=False):
     depts = sorted({dept_of(w) for w in watch if dept_of(w)})
     found = {}
     hit = set()
+    failed = 0
     for i, dept in enumerate(depts):
         if i:
             time.sleep(2)  # be polite to the school's server
@@ -178,6 +179,7 @@ def check_once(cfg, state, topic, dry_run=False):
             sections = parse_sections(fetch_dept(term, dept))
         except Exception as e:  # noqa: BLE001 - never let one dept kill the loop
             log(f"WARN {dept}: fetch/parse failed: {e}")
+            failed += 1
             continue
         log(f"{dept}: {len(sections)} sections returned")
         for sec in sections:
@@ -189,6 +191,29 @@ def check_once(cfg, state, topic, dry_run=False):
     for w in watch:
         if w not in hit:
             log(f"WARN '{w}' matched no section - check the code or the term")
+
+    health = state.get("__health", {})
+    strikes = int(health.get("strikes", 0))
+    warned = bool(health.get("warned", False))
+    blind = failed == len(depts) or not found
+    if blind:
+        strikes += 1
+        log(f"WARN poll found nothing usable (strike {strikes})")
+        if strikes >= 3 and not warned:
+            notify(topic, "Seat watcher is BLIND",
+                   "3 polls in a row returned nothing from Bentley's course "
+                   "listing. The site may be down or changed. Check your "
+                   "sections manually until this clears.",
+                   priority="high", tags="warning", dry_run=dry_run)
+            warned = True
+    else:
+        if warned:
+            notify(topic, "Seat watcher recovered",
+                   f"Back to reading Bentley's listing normally. "
+                   f"Watching {len(found)} sections again.",
+                   priority="default", tags="white_check_mark", dry_run=dry_run)
+        strikes, warned = 0, False
+    state["__health"] = {"strikes": strikes, "warned": warned, "last_poll": now}
 
     for code, sec in sorted(found.items()):
         prev = state.get(code, {})
@@ -254,8 +279,11 @@ def main():
         sys.exit("Set NTFY_TOPIC env var or ntfy_topic in the config.")
 
     if args.test_push:
+        n = len(cfg.get("sections", []))
+        every = cfg.get("interval_minutes", 10)
         notify(topic, "Bentley watcher is live",
-               "If you can read this, alerts work. Now go configure your sections.",
+               f"Watching {n} sections, checking every {every} minutes.\n"
+               f"You'll get an urgent alert the moment one opens.",
                priority="default", tags="white_check_mark", dry_run=args.dry_run)
         return
 
