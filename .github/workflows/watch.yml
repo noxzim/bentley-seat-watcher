@@ -37,6 +37,7 @@ jobs:
         if: inputs.mode == 'verify'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
         run: |
           python3 watcher.py --test-push
           python3 watcher.py --dry-run --state "$RUNNER_TEMP/verify.json"
@@ -55,6 +56,7 @@ jobs:
         if: inputs.mode != 'verify'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
         run: python3 watcher.py --loop --max-minutes 330
 
       - name: Save watcher state

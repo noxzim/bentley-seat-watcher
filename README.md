@@ -80,6 +80,24 @@ hours, then cron restarts it. This is deliberate: GitHub's scheduled triggers
 are routinely 10-30 minutes late, so a cron-per-poll would poll erratically.
 Only the restart is subject to that delay, not each individual check.
 
+## Email backup (optional but recommended)
+
+Phone push can fail silently - an app reinstall, a revoked APNs token, a
+battery saver - and a missed seat can't be retried. Set `ALERT_EMAIL` and ntfy
+forwards a copy of every seat alert by mail, through a delivery path that has
+nothing in common with the push one.
+
+```bash
+gh secret set ALERT_EMAIL   # then paste your address
+```
+
+Locally: `ALERT_EMAIL=you@example.com NTFY_TOPIC=... python3 watcher.py --loop`
+
+Set it as an environment variable or a GitHub secret only - never in
+`watchlist.json`, which is public. ntfy.sh rate-limits free email, so only
+seat alerts and the "watcher is blind" warning are forwarded, not the
+routine recovery notices.
+
 ## Notes
 
 - Alerts fire on Closed→Open, on a seat count going up, and on the re-alert

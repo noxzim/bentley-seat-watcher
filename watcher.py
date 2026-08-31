@@ -126,24 +126,35 @@ def matches(watch_entry, section_code):
 
 # ---------------------------------------------------------------- notifying
 
-def notify(topic, title, message, click=REGISTER_URL, priority="urgent", tags="rotating_light", dry_run=False):
+def notify(topic, title, message, click=REGISTER_URL, priority="urgent", tags="rotating_light", dry_run=False, email=None):
+    """Push to ntfy. If `email` is set, ntfy also forwards a copy by mail.
+
+    Email is a deliberate second channel: phone push can silently break (app
+    reinstalled, APNs unregistered, battery saver), and a missed seat can't be
+    retried. ntfy.sh rate-limits free email, so callers only pass it for
+    alerts that actually matter.
+    """
     if dry_run:
-        log(f"DRY RUN would push -> {title}: {message}")
+        via = f" (+email {email})" if email else ""
+        log(f"DRY RUN would push{via} -> {title}: {message}")
         return
+    headers = {
+        "Title": title,
+        "Priority": priority,
+        "Tags": tags,
+        "Click": click,
+        "User-Agent": UA,
+    }
+    if email:
+        headers["Email"] = email
     req = urllib.request.Request(
         f"https://ntfy.sh/{urllib.parse.quote(topic)}",
         data=message.encode("utf-8"),
-        headers={
-            "Title": title,
-            "Priority": priority,
-            "Tags": tags,
-            "Click": click,
-            "User-Agent": UA,
-        },
+        headers=headers,
     )
     with urllib.request.urlopen(req, timeout=30, context=SSL_CTX) as r:
         r.read()
-    log(f"pushed -> {title}")
+    log(f"pushed{' +email' if email else ''} -> {title}")
 
 
 # ---------------------------------------------------------------- state
@@ -161,7 +172,7 @@ def save_state(path, state):
 
 # ---------------------------------------------------------------- one pass
 
-def check_once(cfg, state, topic, dry_run=False):
+def check_once(cfg, state, topic, dry_run=False, email=None):
     """One poll of every watched department. Returns updated state."""
     watch = cfg["sections"]
     term = cfg["term"]
@@ -204,7 +215,7 @@ def check_once(cfg, state, topic, dry_run=False):
                    "3 polls in a row returned nothing from Bentley's course "
                    "listing. The site may be down or changed. Check your "
                    "sections manually until this clears.",
-                   priority="high", tags="warning", dry_run=dry_run)
+                   priority="high", tags="warning", dry_run=dry_run, email=email)
             warned = True
     else:
         if warned:
@@ -242,6 +253,7 @@ def check_once(cfg, state, topic, dry_run=False):
                 f"{sec['seats']} {seat_word} - {sec['title']}\n"
                 f"{sec['meets']}\n{sec['instructor']}\nRegister in Workday now.",
                 dry_run=dry_run,
+                email=email,
             )
             last_alert = now
         else:
@@ -275,6 +287,9 @@ def main():
         sys.exit(f"No config at {args.config}")
 
     topic = os.environ.get("NTFY_TOPIC") or cfg.get("ntfy_topic", "")
+    # Env-only on purpose: this repo is public, so the address must never be
+    # committable to watchlist.json by accident.
+    email = os.environ.get("ALERT_EMAIL", "").strip() or None
     if not topic and not args.dry_run:
         sys.exit("Set NTFY_TOPIC env var or ntfy_topic in the config.")
 
@@ -285,16 +300,19 @@ def main():
                f"Watching {n} sections, checking every {every} minutes.\n"
                f"Sent at the same urgent priority as a real seat alert, so if "
                f"this banners, real ones will too.",
-               priority="urgent", tags="white_check_mark", dry_run=args.dry_run)
+               priority="urgent", tags="white_check_mark", dry_run=args.dry_run,
+               email=email)
         return
 
+    if email:
+        log(f"email backup enabled -> {email}")
     interval = (args.interval if args.interval is not None else int(cfg.get("interval_minutes", 10))) * 60
     deadline = time.time() + args.max_minutes * 60 if args.max_minutes else None
 
     while True:
         state = load_json(args.state, {})
         try:
-            state = check_once(cfg, state, topic, dry_run=args.dry_run)
+            state = check_once(cfg, state, topic, dry_run=args.dry_run, email=email)
             save_state(args.state, state)
         except Exception as e:  # noqa: BLE001 - a bad poll must not end the watch
             log(f"ERROR poll failed: {e}")
