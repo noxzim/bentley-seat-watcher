@@ -283,8 +283,9 @@ def main():
         every = cfg.get("interval_minutes", 10)
         notify(topic, "Bentley watcher is live",
                f"Watching {n} sections, checking every {every} minutes.\n"
-               f"You'll get an urgent alert the moment one opens.",
-               priority="default", tags="white_check_mark", dry_run=args.dry_run)
+               f"Sent at the same urgent priority as a real seat alert, so if "
+               f"this banners, real ones will too.",
+               priority="urgent", tags="white_check_mark", dry_run=args.dry_run)
         return
 
     interval = (args.interval if args.interval is not None else int(cfg.get("interval_minutes", 10))) * 60
