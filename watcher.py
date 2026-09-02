@@ -203,6 +203,14 @@ def check_once(cfg, state, topic, dry_run=False, email=None):
         if w not in hit:
             log(f"WARN '{w}' matched no section - check the code or the term")
 
+    # Drop history for sections no longer watched. Keyed off the watchlist
+    # rather than this poll's results, so a transient fetch failure can't wipe
+    # alert history and cause a duplicate notification later.
+    for key in [k for k in state if not k.startswith("__")]:
+        if not any(matches(w, key) for w in watch):
+            del state[key]
+            log(f"pruned dropped section from state: {key}")
+
     health = state.get("__health", {})
     strikes = int(health.get("strikes", 0))
     warned = bool(health.get("warned", False))
